@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>열품타 수능 플래너</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ypBg: '#0a0a0a',
+                        ypSurface: '#1a1a1a',
+                        ypSurfaceHover: '#2a2a2a',
+                        ypOrange: '#FF7A00',
+                        ypTextMuted: '#888888',
+                        ypBorder: 'rgba(255,255,255,0.08)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0a0a0a; color: #ffffff; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; user-select: none; font-family: -apple-system, sans-serif; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .hour-row { height: 60px; border-bottom: 1px dashed rgba(255,255,255,0.05); position: relative; }
+        .study-block { position: absolute; left: 55px; right: 0; display: flex; align-items: flex-start; border-top: 1px solid rgba(255,255,255,0.12); border-bottom: 1px solid rgba(255,255,255,0.12); z-index: 5; overflow: hidden; border-radius: 4px 0 0 4px; }
+        .fade-in { animation: fadeIn 0.2s ease-in-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        button:active { transform: scale(0.96); transition: transform 0.1s; }
+        .no-active-scale:active { transform: none; }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col relative">
+
+    <div id="screen-timeline" class="screen-view flex-1 flex flex-col h-full w-full relative">
+        <header class="flex justify-between items-center px-5 py-4 z-20 bg-ypBg/90 backdrop-blur-md absolute top-0 w-full border-b border-ypBorder">
+            <h1 id="headerDate" class="text-lg font-bold tracking-tight"></h1>
+            <button onclick="openGridMenu()" class="text-gray-400 hover:text-white p-1"><i class="ph ph-squares-four text-2xl"></i></button>
+        </header>
+        <div id="timelineScroll" class="flex-1 overflow-y-auto scrollbar-hide pt-[60px] pb-32 relative">
+            <div id="timelineContainer" class="relative">
+                <div id="currentTimeLine" class="absolute left-0 w-full z-10 flex items-center pointer-events-none transition-all duration-1000" style="top: 0px;">
+                    <div id="currentTimeBubble" class="bg-ypOrange text-white text-[10px] font-bold px-1.5 py-0.5 rounded mr-2 ml-1 shadow-md"></div>
+                    <div class="flex-1 h-[1.5px] bg-ypOrange shadow-[0_0_8px_rgba(255,122,0,0.8)]"></div>
+                </div>
+                <div id="hoursList"></div>
+                <div id="blocksContainer" class="absolute top-0 left-0 w-full h-full pointer-events-none"></div>
+            </div>
+        </div>
+        <div class="absolute bottom-8 left-0 w-full z-20 flex justify-center pointer-events-none">
+            <button onclick="openSubjectModal()" class="pointer-events-auto bg-[#e5e5e5] text-black rounded-full px-6 py-3 flex items-center space-x-2 font-bold shadow-xl">
+                <i class="ph-fill ph-play"></i><span id="totalStudyTimeText" class="tracking-wide text-sm font-mono mt-0.5">00:00:00</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="gridMenuModal" class="hidden absolute inset-0 z-50 bg-ypBg/95 backdrop-blur-md flex flex-col fade-in">
+        <header class="flex justify-between items-center px-5 py-4 border-b border-ypBorder">
+            <h2 class="text-lg font-bold">메뉴</h2>
+            <button onclick="closeGridMenu()" class="p-2 -mr-2 text-gray-400 hover:text-white"><i class="ph ph-x text-2xl"></i></button>
+        </header>
+        <div class="p-6 grid grid-cols-3 gap-5 max-w-lg mx-auto w-full">
+            <button onclick="showScreen('screen-timer')" class="flex flex-col items-center space-y-3 p-4 rounded-2xl bg-ypSurface hover:bg-ypSurfaceHover border border-ypBorder"><i class="ph ph-timer text-3xl text-blue-400"></i><span class="text-xs font-medium">타이머</span></button>
+            <button onclick="showScreen('screen-stats')" class="flex flex-col items-center space-y-3 p-4 rounded-2xl bg-ypSurface hover:bg-ypSurfaceHover border border-ypBorder"><i class="ph ph-chart-bar text-3xl text-green-400"></i><span class="text-xs font-medium">통계</span></button>
+            <button onclick="showScreen('screen-todo')" class="flex flex-col items-center space-y-3 p-4 rounded-2xl bg-ypSurface hover:bg-ypSurfaceHover border border-ypBorder"><i class="ph ph-check-square-offset text-3xl text-yellow-400"></i><span class="text-xs font-medium">투두리스트</span></button>
+            <button onclick="showScreen('screen-pomodoro')" class="flex flex-col items-center space-y-3 p-4 rounded-2xl bg-ypSurface hover:bg-ypSurfaceHover border border-ypBorder"><i class="ph ph-clock-countdown text-3xl text-red-400"></i><span class="text-xs font-medium">뽀모도로</span></button>
+            <button onclick="showScreen('screen-csat')" class="flex flex-col items-center space-y-3 p-4 rounded-2xl bg-ypSurface border border-ypOrange/50 relative overflow-hidden"><div class="absolute -top-1 -right-1 w-6 h-6 bg-ypOrange rounded-full blur-md opacity-30"></div><i class="ph ph-exam text-3xl text-ypOrange"></i><span class="text-[11px] font-bold text-ypOrange">수능 실전</span></button>
+        </div>
+    </div>
+
+    <div id="subjectModal" class="hidden absolute inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4 fade-in" onclick="if(event.target===this) closeSubjectModal()">
+        <div class="bg-[#1c1c1e] w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden relative border border-ypBorder">
+            <div class="px-5 py-4 flex justify-between items-center border-b border-ypBorder">
+                <h3 class="font-bold text-lg">과목</h3>
+                <div class="flex items-center space-x-2">
+                    <button onclick="openSubjectEditListModal()" class="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg flex items-center space-x-1 text-gray-300"><i class="ph ph-pencil-simple"></i><span>과목 편집</span></button>
+                    <button onclick="closeSubjectModal()" class="text-gray-400 hover:text-white p-1"><i class="ph ph-x text-lg"></i></button>
+                </div>
+            </div>
+            <div class="p-2 max-h-[50vh] overflow-y-auto" id="subjectListContainer"></div>
+        </div>
+    </div>
+    
+    <div id="subjectEditListModal" class="hidden absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center px-4 fade-in">
+        <div class="bg-[#1c1c1e] w-full max-w-sm rounded-3xl overflow-hidden flex flex-col h-[70vh] border border-ypBorder">
+            <div class="px-5 py-4 flex justify-between items-center border-b border-ypBorder"><button onclick="closeSubjectEditListModal()" class="text-gray-400"><i class="ph ph-caret-left text-xl"></i></button><h3 class="font-bold text-lg">과목 편집</h3><div class="w-5"></div></div>
+            <div class="p-4 border-b border-ypBorder flex justify-between items-center cursor-pointer hover:bg-white/5 transition" onclick="openSubjectDetailModal()"><div class="flex items-center space-x-3 text-gray-300"><i class="ph ph-plus"></i><span class="font-medium text-sm">과목 추가</span></div></div>
+            <div class="flex-1 overflow-y-auto p-3" id="editSubjectListContainer"></div>
+        </div>
+    </div>
+
+    <div id="subjectDetailModal" class="hidden absolute inset-0 z-[60] bg-black/95 backdrop-blur-md flex items-center justify-center px-4 fade-in">
+        <div class="bg-[#1c1c1e] w-full max-w-sm rounded-3xl overflow-hidden border border-ypBorder">
+            <div class="px-5 py-4 flex justify-between items-center border-b border-ypBorder"><button onclick="closeSubjectDetailModal()" class="text-gray-400"><i class="ph ph-x text-xl"></i></button><h3 class="font-bold text-lg" id="detailModalTitle">측정할 과목 이름</h3><button onclick="saveSubjectDetail()" class="text-ypOrange font-bold"><i class="ph ph-check text-xl"></i></button></div>
+            <div class="p-5 space-y-6">
+                <input type="text" id="detailSubName" placeholder="e.g. 수학, 영어, 과학..." class="w-full bg-transparent border-b border-ypBorder focus:border-ypOrange py-2 text-white outline-none">
+                <div class="flex justify-between items-center cursor-pointer" onclick="openColorPicker()"><span class="text-gray-300 font-medium">과목 색상</span><div id="detailSubColorPreview" class="w-6 h-6 rounded-full bg-[#ff6b6b]"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="colorPickerModal" class="hidden absolute inset-0 z-[70] bg-black/60 flex items-center justify-center fade-in">
+        <div class="bg-[#1c1c1e] p-6 rounded-3xl shadow-2xl max-w-[280px] border border-ypBorder text-center">
+            <h4 class="text-sm font-bold mb-4 text-left">색상 선택</h4>
+            <div class="grid grid-cols-5 gap-3 mb-6" id="colorGrid"></div>
+            <div class="flex justify-between space-x-2"><button onclick="closeColorPicker()" class="flex-1 py-2 rounded-xl bg-white/10 font-bold text-sm">취소</button><button onclick="confirmColorPicker()" class="flex-1 py-2 rounded-xl bg-ypOrange text-white font-bold text-sm">확인</button></div>
+        </div>
+    </div>
+
+    <div id="screen-active-study" class="hidden screen-view absolute inset-0 z-40 bg-[#0a0a0a] flex flex-col items-center justify-center fade-in">
+        <div class="absolute top-10 w-full px-6 flex justify-between items-center z-30">
+            <div class="flex items-center space-x-2">
+                <div id="stdSubColorDot" class="w-3 h-3 rounded-full"></div><span id="stdSubjectTitle" class="text-lg font-bold text-white tracking-tight">과목명</span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="toggleActiveTodo()" class="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex justify-center items-center"><i class="ph ph-check-square-offset text-xl text-gray-300"></i></button>
+            </div>
+        </div>
+        <div id="stdDigitalClock" class="text-[5.5rem] leading-none md:text-8xl font-black tabular-nums tracking-widest text-white z-20 drop-shadow-md">00:00:00</div>
+        <button id="btnStopStudy" onclick="stopStandardStudy()" class="w-20 h-20 bg-ypSurface border border-ypBorder rounded-full flex items-center justify-center shadow-xl mt-16 z-30">
+            <i class="ph-fill ph-stop text-3xl text-white"></i>
+        </button>
+        <p class="text-xs text-ypTextMuted mt-4 z-20">종료</p>
+        <div id="activeTodoPopup" class="hidden absolute top-24 right-6 w-64 bg-ypSurface/95 backdrop-blur-md border border-ypBorder rounded-2xl p-4 z-40 max-h-64 overflow-y-auto shadow-2xl">
+            <h4 class="text-sm font-bold mb-3 border-b border-ypBorder pb-2">투두리스트</h4>
+            <div id="activeTodoList" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <div id="screen-csat" class="hidden screen-view absolute inset-0 z-30 bg-ypBg flex flex-col h-full w-full relative">
+        <div id="csatSubjectSelect" class="flex flex-col h-full w-full p-6 max-w-3xl mx-auto">
+            <header class="flex justify-between items-center mb-6 pb-4 border-b border-ypBorder"><h2 class="text-xl font-bold">수능 실전 모드</h2><button onclick="showScreen('screen-timeline')" class="text-gray-400"><i class="ph ph-x text-2xl"></i></button></header>
+            <p class="text-sm text-ypTextMuted mb-4">실제 수능 시간표에 맞춰 연습하세요. 하단 타임라인을 눌러 원하는 시각으로 이동할 수 있으며, 공부한 시간은 해당 과목의 순공 시간에 실시간으로 합산됩니다.</p>
+            <div class="space-y-3 flex-1 overflow-y-auto pb-10">
+                <button onclick="startCsatSession('kor', '국어', '1교시')" class="w-full bg-ypSurface p-4 rounded-2xl flex items-center justify-between border border-ypBorder">
+                    <div class="flex items-center space-x-4"><div class="w-12 h-12 rounded-full bg-[#ff6b6b] flex items-center justify-center"><span class="text-white font-bold text-sm">국</span></div><div class="text-left"><h3 class="font-bold text-white">국어 영역</h3><p class="text-xs text-ypTextMuted mt-0.5">08:25 ~ 10:00</p></div></div><i class="ph ph-caret-right text-gray-500"></i>
+                </button>
+                <button onclick="startCsatSession('math', '수학', '2교시')" class="w-full bg-ypSurface p-4 rounded-2xl flex items-center justify-between border border-ypBorder">
+                    <div class="flex items-center space-x-4"><div class="w-12 h-12 rounded-full bg-[#a55eea] flex items-center justify-center"><span class="text-white font-bold text-sm">수</span></div><div class="text-left"><h3 class="font-bold text-white">수학 영역</h3><p class="text-xs text-ypTextMuted mt-0.5">10:15 ~ 12:10</p></div></div><i class="ph ph-caret-right text-gray-500"></i>
+                </button>
+                <button onclick="startCsatSession('eng', '영어', '3교시')" class="w-full bg-ypSurface p-4 rounded-2xl flex items-center justify-between border border-ypBorder">
+                    <div class="flex items-center space-x-4"><div class="w-12 h-12 rounded-full bg-[#2bcbba] flex items-center justify-center"><span class="text-white font-bold text-sm">영</span></div><div class="text-left"><h3 class="font-bold text-white">영어 영역</h3><p class="text-xs text-ypTextMuted mt-0.5">12:55 ~ 14:20</p></div></div><i class="ph ph-caret-right text-gray-500"></i>
+                </button>
+                <button onclick="startCsatSession('hist', '한국사', '4교시')" class="w-full bg-ypSurface p-4 rounded-2xl flex items-center justify-between border border-ypBorder">
+                    <div class="flex items-center space-x-4"><div class="w-12 h-12 rounded-full bg-[#feca57] flex items-center justify-center"><span class="text-white font-bold text-sm">한</span></div><div class="text-left"><h3 class="font-bold text-white">한국사 영역</h3><p class="text-xs text-ypTextMuted mt-0.5">14:40 ~ 15:20</p></div></div><i class="ph ph-caret-right text-gray-500"></i>
+                </button>
+                <button onclick="startCsatSession('sci', '탐구', '4교시')" class="w-full bg-ypSurface p-4 rounded-2xl flex items-center justify-between border border-ypBorder">
+                    <div class="flex items-center space-x-4"><div class="w-12 h-12 rounded-full bg-[#fa8231] flex items-center justify-center"><span class="text-white font-bold text-sm">탐</span></div><div class="text-left"><h3 class="font-bold text-white">탐구 영역</h3><p class="text-xs text-ypTextMuted mt-0.5">15:25 ~ 16:37</p></div></div><i class="ph ph-caret-right text-gray-500"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="csatActiveContainer" class="hidden absolute inset-0 z-40 bg-[#0f1110] flex flex-col pt-12 pb-8 w-full h-full">
+            <header class="px-5 absolute top-4 left-0 w-full flex justify-between items-center z-10">
+                <button onclick="exitCsatSession()" class="text-gray-400 hover:text-white p-2"><i class="ph ph-x text-2xl"></i></button>
+                <div class="text-xs text-gray-400 font-mono pr-2">누적 순공: <span id="csatSubElapsedText" class="text-ypOrange font-bold">00:00:00</span></div>
+            </header>
+            
+            <div class="flex-1 flex flex-col items-center justify-center w-full relative overflow-y-auto overflow-x-hidden">
+                <div class="border border-white/20 rounded-full px-4 py-1 text-xs font-bold text-gray-300 mb-4 mt-8" id="csatPhaseBadge">1교시</div>
+                <h1 id="csatPhaseTitle" class="text-3xl font-black mb-1 text-white">예비령</h1>
+                <p id="csatSubjectTimeSpan" class="text-[11px] text-gray-500 mb-auto">국어 · 8:40~10:00</p>
+                
+                <div class="relative w-64 h-64 md:w-[40vh] md:h-[40vh] my-6 flex-shrink-0">
+                    <canvas id="csatClockCanvas" width="400" height="400" class="w-full h-full drop-shadow-2xl"></canvas>
+                </div>
+
+                <div class="w-full max-w-2xl px-6 mt-auto mb-8 relative mx-auto">
+                    <div class="absolute left-6 right-6 top-[22px] h-[1px] bg-gray-700 pointer-events-none"></div>
+                    <div class="flex justify-between relative z-10 text-center" id="csatTimelineNodes"></div>
+                </div>
+
+                <div class="flex items-center justify-center space-x-4 md:space-x-8 w-full pb-safe mb-4">
+                    <button onclick="seekCsat(-60)" class="flex flex-col items-center justify-center text-gray-400 hover:text-white h-16 w-12 active:scale-95 transition">
+                        <i class="ph ph-arrow-u-up-left text-3xl mb-0.5"></i><span class="text-[9px] font-bold leading-none">-1분</span>
+                    </button>
+                    <button onclick="toggleCsat()" class="w-16 h-16 rounded-full bg-[#1c221e] border border-white/10 flex justify-center items-center text-white shadow-xl active:scale-95 transition">
+                        <i id="csatPlayIcon" class="ph-fill ph-play text-4xl hidden"></i><i id="csatPauseIcon" class="ph-fill ph-pause text-4xl"></i>
+                    </button>
+                    <button onclick="seekCsat(60)" class="flex flex-col items-center justify-center text-gray-400 hover:text-white h-16 w-12 active:scale-95 transition">
+                        <i class="ph ph-arrow-u-up-right text-3xl mb-0.5"></i><span class="text-[9px] font-bold leading-none">+1분</span>
+                    </button>
+                    <button onclick="recordCsatLap()" class="bg-[#1c221e] border border-[#2f3e35] rounded-full px-5 h-12 flex items-center space-x-1.5 text-sm font-bold text-gray-300 hover:bg-[#2f3e35] ml-4 active:scale-95 transition">
+                        <i class="ph ph-flag"></i><span>구간 기록</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="csatLapContainer" class="absolute bottom-24 w-[90%] left-[5%] max-w-sm mx-auto md:left-1/2 md:-translate-x-1/2 bg-ypSurface/95 backdrop-blur-md rounded-2xl p-4 border border-ypBorder shadow-2xl transition-transform duration-300 translate-y-[200%] max-h-48 overflow-y-auto z-50">
+                <div class="flex justify-between items-center mb-2 pb-1 border-b border-ypBorder">
+                    <span class="text-xs font-bold text-gray-400">구간 기록 목록</span>
+                    <button onclick="document.getElementById('csatLapContainer').classList.add('translate-y-[200%y]')" class="text-xs text-ypOrange font-bold">닫기</button>
+                </div>
+                <div id="csatLapList" class="space-y-1"></div>
+            </div>
+            
+            <div id="csatStartCover" class="absolute inset-0 bg-[#0f1110]/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center cursor-pointer fade-in" onclick="startCsatActually()">
+                <p class="text-xl font-bold mb-12">화면을 터치하면 시작합니다</p>
+                <div class="absolute bottom-10 left-8 right-8 text-xs text-gray-400 space-y-3 leading-relaxed">
+                    <p>· 아래 타임라인의 글자(예비령, 준비령, 본령 등)를 누르면 그 시각으로 즉시 이동합니다.</p>
+                    <p>· 구간 기록 버튼으로 시간 배분을 남길 수 있어요.</p>
+                    <p>· <strong class="text-ypOrange">실제 공부한 시간은 선택한 과목의 순공 시간에 실시간으로 합산됩니다.</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-timer" class="hidden screen-view absolute inset-0 z-30 bg-ypBg flex flex-col h-full w-full">
+        <header class="flex justify-between items-center px-5 py-4 border-b border-ypBorder bg-ypBg/90">
+            <h2 class="text-lg font-bold">시간 측정기</h2><button onclick="showScreen('screen-timeline')" class="text-gray-400"><i class="ph ph-x text-2xl"></i></button>
+        </header>
+        <div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-sm mx-auto">
+            <div class="flex bg-white/5 rounded-xl p-1 mb-12 w-full">
+                <button onclick="setTimerMode('stopwatch')" id="btnModeSw" class="flex-1 py-2.5 text-sm font-bold bg-white/10 rounded-lg shadow-sm text-white transition">스톱워치</button>
+                <button onclick="setTimerMode('countdown')" id="btnModeCd" class="flex-1 py-2.5 text-sm font-bold text-gray-400 hover:text-white rounded-lg transition">타이머</button>
+            </div>
+            <div id="toolTimeDisplay" class="text-[5rem] font-black tabular-nums tracking-wider text-white mb-10 text-center w-full leading-none">00:00:00</div>
+            <div id="cdInputs" class="hidden items-center justify-center space-x-3 mb-10 w-full transition-opacity">
+                <div class="flex flex-col items-center"><input type="number" id="inpCdH" min="0" max="23" value="0" class="w-16 h-16 bg-ypSurface text-center text-2xl font-bold rounded-xl border border-ypBorder outline-none"><span class="text-xs text-gray-500 mt-2">시간</span></div><span class="text-2xl font-bold text-gray-500 mb-6">:</span>
+                <div class="flex flex-col items-center"><input type="number" id="inpCdM" min="0" max="59" value="10" class="w-16 h-16 bg-ypSurface text-center text-2xl font-bold rounded-xl border border-ypBorder outline-none"><span class="text-xs text-gray-500 mt-2">분</span></div><span class="text-2xl font-bold text-gray-500 mb-6">:</span>
+                <div class="flex flex-col items-center"><input type="number" id="inpCdS" min="0" max="59" value="0" class="w-16 h-16 bg-ypSurface text-center text-2xl font-bold rounded-xl border border-ypBorder outline-none"><span class="text-xs text-gray-500 mt-2">초</span></div>
+            </div>
+            <div class="flex space-x-6 mt-4">
+                <button onclick="toggleToolTimer()" class="w-20 h-20 bg-ypOrange text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition no-active-scale"><i id="toolPlayIcon" class="ph-fill ph-play text-4xl"></i><i id="toolPauseIcon" class="ph-fill ph-pause text-4xl hidden"></i></button>
+                <button onclick="resetToolTimer()" class="w-20 h-20 bg-ypSurface border border-ypBorder text-white rounded-full flex items-center justify-center hover:bg-ypSurfaceHover transition no-active-scale"><i class="ph ph-arrow-counter-clockwise text-3xl text-gray-400"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-pomodoro" class="hidden screen-view absolute inset-0 z-30 bg-ypBg flex flex-col h-full w-full">
+        <header class="flex justify-between items-center px-5 py-4 border-b border-ypBorder bg-ypBg/90">
+            <h2 class="text-lg font-bold">뽀모도로</h2><button onclick="showScreen('screen-timeline')" class="text-gray-400"><i class="ph ph-x text-2xl"></i></button>
+        </header>
+        <div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
+            <div class="w-64 h-64 flex flex-col items-center justify-center relative mb-12">
+                <svg viewBox="0 0 256 256" class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
+                    <circle cx="128" cy="128" r="116" stroke="rgba(255,255,255,0.06)" stroke-width="12" fill="none"></circle>
+                    <circle cx="128" cy="128" r="116" stroke="#ef4444" stroke-width="12" stroke-linecap="round" fill="none" id="pomoProgress" style="stroke-dasharray: 728.85; stroke-dashoffset: 0; transition: stroke-dashoffset 0.8s linear, stroke 0.3s ease;"></circle>
+                </svg>
+                <span id="pomoPhaseText" class="text-sm font-bold text-red-500 tracking-widest mb-1 uppercase z-10">집중</span>
+                <span id="pomoTimeText" class="text-[3.5rem] leading-none font-black tabular-nums z-10 text-white">25:00</span>
+            </div>
+            <div id="pomoSettings" class="flex space-x-6 mb-10 w-full px-8 transition-opacity">
+                <div class="flex flex-col items-center flex-1 bg-white/5 p-4 rounded-2xl border border-ypBorder">
+                    <label class="text-xs font-bold text-gray-400 mb-2">집중 (분)</label>
+                    <input type="number" id="inpPomoW" value="25" min="1" max="180" oninput="updatePomodoroSettings()" class="w-full bg-transparent text-center text-3xl font-black outline-none text-white">
+                </div>
+                <div class="flex flex-col items-center flex-1 bg-white/5 p-4 rounded-2xl border border-ypBorder">
+                    <label class="text-xs font-bold text-gray-400 mb-2">휴식 (분)</label>
+                    <input type="number" id="inpPomoR" value="5" min="1" max="60" oninput="updatePomodoroSettings()" class="w-full bg-transparent text-center text-3xl font-black outline-none text-blue-400">
+                </div>
+            </div>
+            <div class="flex space-x-3 w-[calc(100%-4rem)]">
+                <button onclick="togglePomodoro()" id="btnPomo" class="flex-1 bg-red-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-red-500/20 active:scale-95 transition">집중 시작</button>
+                <button onclick="resetPomodoro()" class="w-14 bg-ypSurface border border-ypBorder text-gray-300 hover:text-white rounded-2xl flex items-center justify-center active:scale-95 transition"><i class="ph ph-arrow-counter-clockwise text-xl"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-stats" class="hidden screen-view absolute inset-0 z-30 bg-ypBg flex flex-col h-full w-full">
+        <header class="flex justify-between items-center px-5 py-4 border-b border-ypBorder"><h2 class="text-lg font-bold">오늘의 통계</h2><button onclick="showScreen('screen-timeline')" class="text-gray-400"><i class="ph ph-x text-2xl"></i></button></header>
+        <div class="flex-1 overflow-y-auto p-6 w-full max-w-md mx-auto">
+            <div class="bg-ypSurface rounded-3xl p-6 border border-ypBorder mb-6 text-center">
+                <p class="text-sm text-gray-400 mb-1">총 누적 순공 시간</p><h3 id="statTotalTime" class="text-4xl font-black text-white font-mono">00:00:00</h3>
+            </div>
+            <h4 class="text-sm font-bold text-gray-400 mb-4 px-1">과목별 공부 시간 비중</h4>
+            <div id="statBarsContainer" class="space-y-6"></div>
+        </div>
+    </div>
+
+    <div id="screen-todo" class="hidden screen-view absolute inset-0 z-30 bg-ypBg flex flex-col h-full w-full">
+        <header class="flex justify-between items-center px-5 py-4 border-b border-ypBorder bg-ypBg/90 sticky top-0"><h2 class="text-lg font-bold">투두리스트</h2><button onclick="showScreen('screen-timeline')" class="text-gray-400"><i class="ph ph-x text-2xl"></i></button></header>
+        <div class="p-6 flex-1 overflow-y-auto w-full max-w-md mx-auto">
+            <form onsubmit="addMainTodo(event)" class="flex space-x-2 mb-8 relative">
+                <input type="text" id="mainTodoInput" placeholder="공부할 내용 추가" class="flex-1 bg-ypSurface border border-ypBorder rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-ypOrange transition pr-12">
+                <button type="submit" class="absolute right-2 top-2 bottom-2 w-10 bg-ypOrange text-white rounded-xl flex items-center justify-center"><i class="ph ph-plus font-bold"></i></button>
+            </form>
+            <div id="mainTodoList" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'yp_data_v7';
+        let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+            subjects: [
+                { id: 1, name: '국어', color: '#ff6b6b', elapsed: 0 },
+                { id: 2, name: '수학', color: '#a55eea', elapsed: 0 },
+                { id: 3, name: '영어', color: '#2bcbba', elapsed: 0 },
+                { id: 4, name: '한국사', color: '#feca57', elapsed: 0 },
+                { id: 5, name: '탐구', color: '#fa8231', elapsed: 0 }
+            ],
+            sessions: [],
+            todos: []
+        };
+        const colorPalette = ['#ff6b6b', '#ff9f43', '#feca57', '#1dd1a1', '#2bcbba', '#48dbfb', '#54a0ff', '#a55eea', '#f368e0', '#c8d6e5', '#8395a7', '#576574'];
+
+        function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+        function formatHM(s) {
+            const sec = Math.max(0, Math.floor(s));
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const sc = sec % 60;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')}`;
+        }
+
+        function updateTotalStudyTime() {
+            const total = state.subjects.reduce((acc, cur) => acc + (cur.elapsed || 0), 0);
+            document.getElementById('totalStudyTimeText').innerText = formatHM(total);
+        }
+
+        function renderTimelineBlocks() {
+            const container = document.getElementById('blocksContainer');
+            if (!container) return;
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            container.innerHTML = state.sessions
+                .filter(s => s.end > todayStart.getTime())
+                .map(s => {
+                    const st = new Date(Math.max(s.start, todayStart.getTime()));
+                    const et = new Date(s.end);
+                    const startMin = st.getHours() * 60 + st.getMinutes() + st.getSeconds() / 60;
+                    const endMin = et.getHours() * 60 + et.getMinutes() + et.getSeconds() / 60;
+                    const height = Math.max(4, endMin - startMin);
+                    return `
+                        <div class="study-block px-3 py-1" style="top:${startMin}px; height:${height}px; background-color:${s.color}28; border-left: 3px solid ${s.color};">
+                            <span class="text-[10px] font-bold truncate" style="color:${s.color}">${s.name}</span>
+                        </div>
+                    `;
+                }).join('');
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen-view').forEach(s => s.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+            closeGridMenu();
+            if (id === 'screen-timeline') { updateTotalStudyTime(); renderTimelineBlocks(); scrollToCurrentTime(); }
+            if (id === 'screen-stats') renderStats();
+            if (id === 'screen-todo') renderMainTodos();
+        }
+        function openGridMenu() { document.getElementById('gridMenuModal').classList.remove('hidden'); }
+        function closeGridMenu() { document.getElementById('gridMenuModal').classList.add('hidden'); }
+
+        function initApp() {
+            const now = new Date();
+            document.getElementById('headerDate').innerText = `${now.getMonth()+1}. ${now.getDate()} (${['일','월','화','수','목','금','토'][now.getDay()]})`;
+            let hGrid = '';
+            for (let i = 0; i < 24; i++) {
+                hGrid += `<div class="hour-row flex items-start w-full"><div class="w-12 text-right pr-3 pt-1 text-[10px] text-gray-600 font-medium">${i%12||12} ${i<12?'AM':'PM'}</div><div class="flex-1 border-l border-white/5 h-full"></div></div>`;
+            }
+            document.getElementById('hoursList').innerHTML = hGrid;
+            setInterval(updateTimeSync, 30000);
+            updateTimeSync();
+            renderTimelineBlocks();
+            setTimeout(scrollToCurrentTime, 100);
+            updateTotalStudyTime();
+        }
+        function updateTimeSync() {
+            const now = new Date();
+            const min = now.getHours() * 60 + now.getMinutes();
+            document.getElementById('currentTimeLine').style.top = `${min}px`;
+            document.getElementById('currentTimeBubble').innerText = `${now.getHours()%12||12}:${String(now.getMinutes()).padStart(2,'0')}`;
+        }
+        function scrollToCurrentTime() {
+            const c = document.getElementById('timelineScroll');
+            if (c) c.scrollTo({ top: Math.max(0, (new Date().getHours() * 60) - c.clientHeight / 2), behavior: 'smooth' });
+        }
+
+        let activeEditSubId = null;
+        function openSubjectModal() { renderSubjectSelect(); document.getElementById('subjectModal').classList.remove('hidden'); }
+        function closeSubjectModal() { document.getElementById('subjectModal').classList.add('hidden'); }
+        function openSubjectEditListModal() { closeSubjectModal(); renderSubjectEditList(); document.getElementById('subjectEditListModal').classList.remove('hidden'); }
+        function closeSubjectEditListModal() { document.getElementById('subjectEditListModal').classList.add('hidden'); openSubjectModal(); }
+        
+        function renderSubjectSelect() {
+            document.getElementById('subjectListContainer').innerHTML = state.subjects.map(s => `
+                <div onclick="startStandardStudy(${s.id})" class="flex justify-between items-center p-4 rounded-2xl hover:bg-white/5 cursor-pointer">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full flex justify-center items-center shadow-md" style="background-color:${s.color}">
+                            <i class="ph-fill ph-play text-white"></i>
+                        </div>
+                        <span class="font-bold">${s.name}</span>
+                    </div>
+                    <span class="text-sm font-mono text-gray-400">${formatHM(s.elapsed)}</span>
+                </div>
+            `).join('');
+        }
+        function renderSubjectEditList() {
+            document.getElementById('editSubjectListContainer').innerHTML = state.subjects.map(s => `
+                <div class="flex justify-between items-center p-3 mb-2 bg-black/30 rounded-xl border border-ypBorder">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-3 h-3 rounded-full" style="background-color:${s.color}"></div>
+                        <span class="text-sm font-medium">${s.name}</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="openSubjectDetailModal(${s.id})" class="text-gray-400 hover:text-white p-2"><i class="ph ph-pencil-simple text-lg"></i></button>
+                        <button onclick="deleteSubject(${s.id})" class="text-gray-400 hover:text-red-500 p-2"><i class="ph ph-trash text-lg"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        function deleteSubject(id) { state.subjects = state.subjects.filter(s => s.id !== id); saveData(); renderSubjectEditList(); updateTotalStudyTime(); }
+
+        function openSubjectDetailModal(id = null) {
+            activeEditSubId = id;
+            if (id) {
+                const s = state.subjects.find(x => x.id === id);
+                document.getElementById('detailSubName').value = s.name;
+                document.getElementById('detailSubColorPreview').style.backgroundColor = s.color;
+            } else {
+                document.getElementById('detailSubName').value = '';
+                document.getElementById('detailSubColorPreview').style.backgroundColor = colorPalette[0];
+            }
+            document.getElementById('subjectDetailModal').classList.remove('hidden');
+        }
+        function closeSubjectDetailModal() { document.getElementById('subjectDetailModal').classList.add('hidden'); }
+        function saveSubjectDetail() {
+            const name = document.getElementById('detailSubName').value.trim();
+            const color = document.getElementById('detailSubColorPreview').style.backgroundColor;
+            if (!name) { alert('과목 이름을 입력해주세요.'); return; }
+            if (activeEditSubId) {
+                const s = state.subjects.find(x => x.id === activeEditSubId);
+                s.name = name;
+                s.color = color;
+            } else {
+                state.subjects.push({ id: Date.now(), name, color, elapsed: 0 });
+            }
+            saveData();
+            closeSubjectDetailModal();
+            renderSubjectEditList();
+        }
+
+        function openColorPicker() {
+            document.getElementById('colorGrid').innerHTML = colorPalette.map(c => `<div onclick="selectColor('${c}')" class="w-10 h-10 rounded-full cursor-pointer hover:scale-110 active:scale-95" style="background-color:${c}"></div>`).join('');
+            document.getElementById('colorPickerModal').classList.remove('hidden');
+        }
+        function closeColorPicker() { document.getElementById('colorPickerModal').classList.add('hidden'); }
+        let tempColor = null;
+        function selectColor(c) { tempColor = c; confirmColorPicker(); }
+        function confirmColorPicker() {
+            if (tempColor) document.getElementById('detailSubColorPreview').style.backgroundColor = tempColor;
+            closeColorPicker();
+        }
+
+        let stdInterval = null, stdElapsed = 0, currentSessionStart = null, activeSub = null;
+        function startStandardStudy(subId) {
+            closeSubjectModal();
+            activeSub = state.subjects.find(s => s.id === subId);
+            stdElapsed = activeSub.elapsed;
+            currentSessionStart = Date.now();
+            document.getElementById('stdSubjectTitle').innerText = activeSub.name;
+            document.getElementById('stdSubColorDot').style.backgroundColor = activeSub.color;
+            document.getElementById('stdDigitalClock').innerText = formatHM(stdElapsed);
+            showScreen('screen-active-study');
+            renderActiveTodos();
+            
+            clearInterval(stdInterval);
+            stdInterval = setInterval(() => {
+                stdElapsed++;
+                activeSub.elapsed = stdElapsed;
+                document.getElementById('stdDigitalClock').innerText = formatHM(stdElapsed);
+                updateTotalStudyTime();
+                if (stdElapsed % 5 === 0) saveData();
+            }, 1000);
+        }
+
+        function stopStandardStudy() {
+            clearInterval(stdInterval);
+            if (currentSessionStart && activeSub && (Date.now() - currentSessionStart) > 1000) {
+                state.sessions.push({
+                    subId: activeSub.id,
+                    name: activeSub.name,
+                    color: activeSub.color,
+                    start: currentSessionStart,
+                    end: Date.now()
+                });
+            }
+            currentSessionStart = null;
+            activeSub = null;
+            saveData();
+            document.getElementById('activeTodoPopup').classList.add('hidden');
+            showScreen('screen-timeline');
+        }
+
+        function toggleActiveTodo() {
+            renderActiveTodos();
+            document.getElementById('activeTodoPopup').classList.toggle('hidden');
+        }
+
+        const CSAT_CONFIG = {
+            'kor': { nodes: [{n:'예비령',h:8,m:25},{n:'준비령',h:8,m:35},{n:'본령',h:8,m:40},{n:'10분전',h:9,m:50},{n:'종료',h:10,m:0}] },
+            'math': { nodes: [{n:'예비령',h:10,m:15},{n:'준비령',h:10,m:25},{n:'본령',h:10,m:30},{n:'10분전',h:12,m:0},{n:'종료',h:12,m:10}] },
+            'eng': { nodes: [{n:'예비령',h:12,m:55},{n:'준비령',h:13,m:5},{n:'본령',h:13,m:10},{n:'10분전',h:14,m:10},{n:'종료',h:14,m:20}] },
+            'hist': { nodes: [{n:'예비령',h:14,m:40},{n:'준비령',h:14,m:45},{n:'본령',h:14,m:50},{n:'5분전',h:15,m:15},{n:'종료',h:15,m:20}] },
+            'sci': { nodes: [{n:'예비령',h:15,m:25},{n:'준비령',h:15,m:30},{n:'본령',h:15,m:35},{n:'5분전',h:16,m:32},{n:'종료',h:16,m:37}] },
+        };
+        let csatVTime = 0, csatMinBound = 0, csatMaxBound = 0;
+        let csatInterval = null, csatAnimFrame = null, csatRunning = false, curCsatNodes = [], csatSubject = null;
+        let csatLaps = [];
+
+        function startCsatSession(key, subjectName, badge) {
+            document.getElementById('screen-csat').classList.remove('hidden');
+            document.getElementById('csatActiveContainer').classList.remove('hidden');
+            document.getElementById('csatSubjectSelect').classList.add('hidden');
+            
+            let sub = state.subjects.find(s => s.name === subjectName || s.name.includes(subjectName));
+            if (!sub) {
+                const defaultColors = { '국어': '#ff6b6b', '수학': '#a55eea', '영어': '#2bcbba', '한국사': '#feca57', '탐구': '#fa8231' };
+                sub = { id: Date.now(), name: subjectName, color: defaultColors[subjectName] || '#FF7A00', elapsed: 0 };
+                state.subjects.push(sub);
+                saveData();
+            }
+            csatSubject = sub;
+            activeSub = sub;
+            
+            curCsatNodes = CSAT_CONFIG[key].nodes;
+            csatMinBound = curCsatNodes[0].h * 3600 + curCsatNodes[0].m * 60;
+            csatMaxBound = curCsatNodes[curCsatNodes.length - 1].h * 3600 + curCsatNodes[curCsatNodes.length - 1].m * 60;
+            csatVTime = csatMinBound;
+            csatRunning = false;
+            currentSessionStart = null;
+            csatLaps = [];
+            document.getElementById('csatLapList').innerHTML = '';
+            document.getElementById('csatLapContainer').classList.add('translate-y-[200%]');
+            
+            document.getElementById('csatPhaseBadge').innerText = badge;
+            document.getElementById('csatSubjectTimeSpan').innerText = `${subjectName} · ${curCsatNodes[2].h}:${String(curCsatNodes[2].m).padStart(2,'0')}~${curCsatNodes[curCsatNodes.length-1].h}:${String(curCsatNodes[curCsatNodes.length-1].m).padStart(2,'0')}`;
+            document.getElementById('csatSubElapsedText').innerText = formatHM(csatSubject.elapsed);
+            
+            document.getElementById('csatTimelineNodes').innerHTML = curCsatNodes.map(p => {
+                const targetSecs = p.h * 3600 + p.m * 60;
+                return `
+                    <button type="button" onclick="jumpToCsatTime(${targetSecs})" class="flex flex-col items-center cursor-pointer px-2 py-1 rounded-xl hover:bg-white/5 active:scale-95 transition focus:outline-none">
+                        <span class="text-[10px] text-gray-400 mb-2 font-mono">${p.h}:${String(p.m).padStart(2,'0')}</span>
+                        <div id="csdot-${p.h}-${p.m}" class="w-3.5 h-3.5 rounded-full bg-white/20 border-2 border-[#0f1110] mb-2 z-10 transition-colors"></div>
+                        <span id="cslbl-${p.h}-${p.m}" class="text-[11px] font-bold text-gray-500 whitespace-nowrap transition-colors">${p.n}</span>
+                    </button>
+                `;
+            }).join('');
+            
+            document.getElementById('csatStartCover').classList.remove('hidden');
+            updateCsatUI();
+            drawCsatClock();
+        }
+
+        function jumpToCsatTime(targetSeconds) {
+            csatVTime = Math.max(csatMinBound, Math.min(csatMaxBound, targetSeconds));
+            updateCsatUI();
+            drawCsatClock();
+        }
+
+        function startCsatActually() {
+            document.getElementById('csatStartCover').classList.add('hidden');
+            if (!csatRunning) toggleCsat();
+        }
+
+        function toggleCsat() {
+            csatRunning = !csatRunning;
+            document.getElementById('csatPlayIcon').classList.toggle('hidden', csatRunning);
+            document.getElementById('csatPauseIcon').classList.toggle('hidden', !csatRunning);
+            
+            if (csatRunning) {
+                currentSessionStart = Date.now();
+                clearInterval(csatInterval);
+                csatInterval = setInterval(() => {
+                    csatVTime++;
+                    if (csatSubject) {
+                        csatSubject.elapsed = (csatSubject.elapsed || 0) + 1;
+                        document.getElementById('csatSubElapsedText').innerText = formatHM(csatSubject.elapsed);
+                        updateTotalStudyTime();
+                        if (csatSubject.elapsed % 5 === 0) saveData();
+                    }
+                    if (csatVTime >= csatMaxBound) {
+                        csatVTime = csatMaxBound;
+                        toggleCsat();
+                    }
+                    updateCsatUI();
+                }, 1000);
+                csatAnimLoop();
+            } else {
+                clearInterval(csatInterval);
+                cancelAnimationFrame(csatAnimFrame);
+                if (currentSessionStart && csatSubject && (Date.now() - currentSessionStart) > 1000) {
+                    state.sessions.push({
+                        subId: csatSubject.id,
+                        name: csatSubject.name,
+                        color: csatSubject.color,
+                        start: currentSessionStart,
+                        end: Date.now()
+                    });
+                }
+                currentSessionStart = null;
+                saveData();
+            }
+        }
+
+        function seekCsat(secs) {
+            let n = csatVTime + secs;
+            if (n < csatMinBound) n = csatMinBound;
+            if (n > csatMaxBound) n = csatMaxBound;
+            csatVTime = n;
+            updateCsatUI();
+            drawCsatClock();
+        }
+
+        function exitCsatSession() {
+            if (csatRunning) toggleCsat();
+            document.getElementById('csatActiveContainer').classList.add('hidden');
+            document.getElementById('csatSubjectSelect').classList.remove('hidden');
+            updateTotalStudyTime();
+            renderTimelineBlocks();
+        }
+
+        function updateCsatUI() {
+            let curN = curCsatNodes[0].n;
+            curCsatNodes.forEach(p => {
+                const t = p.h * 3600 + p.m * 60;
+                const d = document.getElementById(`csdot-${p.h}-${p.m}`);
+                const l = document.getElementById(`cslbl-${p.h}-${p.m}`);
+                if (!d || !l) return;
+                if (csatVTime >= t) {
+                    d.className = "w-3.5 h-3.5 rounded-full bg-ypOrange border-2 border-[#0f1110] mb-2 z-10 transition-colors";
+                    l.className = "text-[11px] font-bold text-white whitespace-nowrap transition-colors";
+                    curN = p.n;
+                } else {
+                    d.className = "w-3.5 h-3.5 rounded-full bg-white/20 border-2 border-[#0f1110] mb-2 z-10 transition-colors";
+                    l.className = "text-[11px] font-bold text-gray-500 whitespace-nowrap transition-colors";
+                }
+            });
+            document.getElementById('csatPhaseTitle').innerText = curN;
+        }
+
+        function drawCsatClock() {
+            const c = document.getElementById('csatClockCanvas');
+            if (!c) return;
+            const ctx = c.getContext('2d'), r = c.width / 2;
+            const h = (csatVTime / 3600) % 12, m = (csatVTime % 3600) / 60, s = csatVTime % 60;
+            const accentColor = (csatSubject && csatSubject.color) ? csatSubject.color : '#FF7A00';
+            ctx.clearRect(0, 0, c.width, c.height);
+            ctx.save();
+            ctx.translate(r, r);
+            ctx.beginPath(); ctx.arc(0, 0, r - 10, 0, 2 * Math.PI); ctx.fillStyle = '#1c221e'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#2f3e35'; ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, r - 20, 0, 2 * Math.PI); ctx.fillStyle = '#f5f5f0'; ctx.fill();
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#222'; ctx.font = 'bold 16px sans-serif';
+            for (let i = 1; i <= 60; i++) {
+                const ang = i * Math.PI / 30 - Math.PI / 2;
+                if (i % 5 === 0) {
+                    ctx.fillText((i / 5).toString(), (r - 44) * Math.cos(ang), (r - 44) * Math.sin(ang));
+                    ctx.beginPath(); ctx.arc((r - 26) * Math.cos(ang), (r - 26) * Math.sin(ang), 2.5, 0, 2 * Math.PI); ctx.fill();
+                } else {
+                    ctx.beginPath(); ctx.arc((r - 26) * Math.cos(ang), (r - 26) * Math.sin(ang), 1, 0, 2 * Math.PI); ctx.fillStyle = '#999'; ctx.fill(); ctx.fillStyle = '#222';
+                }
+            }
+            const dh = (a, l, w, co) => { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(l * Math.cos(a), l * Math.sin(a)); ctx.lineWidth = w; ctx.strokeStyle = co; ctx.lineCap = 'round'; ctx.stroke(); };
+            dh(h * Math.PI / 6 - Math.PI / 2 + (m / 60) * Math.PI / 6, r * 0.45, 6, '#111');
+            dh(m * Math.PI / 30 - Math.PI / 2, r * 0.65, 4, '#333');
+            dh(s * Math.PI / 30 - Math.PI / 2, r * 0.7, 2, accentColor);
+            ctx.beginPath(); ctx.arc(0, 0, 5, 0, 2 * Math.PI); ctx.fillStyle = accentColor; ctx.fill();
+            ctx.restore();
+        }
+        function csatAnimLoop() {
+            drawCsatClock();
+            if (csatRunning) csatAnimFrame = requestAnimationFrame(csatAnimLoop);
+        }
+        function recordCsatLap() {
+            csatLaps.push(csatVTime);
+            document.getElementById('csatLapList').innerHTML += `
+                <div class="flex justify-between py-2 border-b border-ypBorder">
+                    <span class="text-sm font-bold text-gray-400">구간 ${csatLaps.length}</span>
+                    <span class="text-sm font-mono text-white">${formatHM(csatVTime)}</span>
+                </div>
+            `;
+            document.getElementById('csatLapContainer').classList.remove('translate-y-[200%]');
+        }
+
+        const POMO_CIRCUMFERENCE = 2 * Math.PI * 116;
+        let pomoRun = false, pomoInter = null, pomoSecs = 25 * 60, pomoMax = 25 * 60, isWork = true;
+
+        function setPomoCircleProgress(ratio) {
+            const circle = document.getElementById('pomoProgress');
+            if (!circle) return;
+            const clamped = Math.max(0, Math.min(1, ratio));
+            const offset = POMO_CIRCUMFERENCE * (1 - clamped);
+            circle.style.strokeDasharray = `${POMO_CIRCUMFERENCE}`;
+            circle.style.strokeDashoffset = `${offset}`;
+        }
+
+        function updatePomodoroSettings() {
+            if (!pomoRun) {
+                const wMin = Math.max(1, parseInt(document.getElementById('inpPomoW').value) || 25);
+                pomoMax = wMin * 60;
+                pomoSecs = pomoMax;
+                isWork = true;
+                document.getElementById('pomoTimeText').innerText = `${String(wMin).padStart(2,'0')}:00`;
+                document.getElementById('pomoPhaseText').innerText = '집중';
+                document.getElementById('pomoPhaseText').className = 'text-sm font-bold text-red-500 tracking-widest mb-1 uppercase z-10';
+                document.getElementById('pomoProgress').setAttribute('stroke', '#ef4444');
+                setPomoCircleProgress(1);
+            }
+        }
+
+        function togglePomodoro() {
+            pomoRun = !pomoRun;
+            const btn = document.getElementById('btnPomo');
+            if (pomoRun) {
+                btn.innerText = '일시 정지';
+                btn.className = "flex-1 bg-white/10 text-white py-4 rounded-2xl font-bold text-lg border border-ypBorder active:scale-95 transition";
+                pomoInter = setInterval(() => {
+                    pomoSecs--;
+                    if (pomoSecs < 0) {
+                        isWork = !isWork;
+                        const nextMin = Math.max(1, parseInt(document.getElementById(isWork ? 'inpPomoW' : 'inpPomoR').value) || (isWork ? 25 : 5));
+                        pomoMax = nextMin * 60;
+                        pomoSecs = pomoMax;
+                        document.getElementById('pomoPhaseText').innerText = isWork ? '집중' : '휴식';
+                        document.getElementById('pomoPhaseText').className = isWork
+                            ? 'text-sm font-bold text-red-500 tracking-widest mb-1 uppercase z-10'
+                            : 'text-sm font-bold text-blue-400 tracking-widest mb-1 uppercase z-10';
+                        document.getElementById('pomoProgress').setAttribute('stroke', isWork ? '#ef4444' : '#60a5fa');
+                    }
+                    const m = Math.floor(pomoSecs / 60);
+                    const s = pomoSecs % 60;
+                    document.getElementById('pomoTimeText').innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                    setPomoCircleProgress(pomoSecs / pomoMax);
+                }, 1000);
+            } else {
+                clearInterval(pomoInter);
+                btn.innerText = '이어서 하기';
+                btn.className = "flex-1 bg-red-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition";
+            }
+        }
+
+        function resetPomodoro() {
+            clearInterval(pomoInter);
+            pomoRun = false;
+            const btn = document.getElementById('btnPomo');
+            btn.innerText = '집중 시작';
+            btn.className = "flex-1 bg-red-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-red-500/20 active:scale-95 transition";
+            updatePomodoroSettings();
+        }
+
+        let toolMode = 'stopwatch', toolRun = false, toolInter = null, toolSecs = 0;
+        function setTimerMode(m) {
+            toolMode = m;
+            toolRun = false;
+            clearInterval(toolInter);
+            document.getElementById('btnModeSw').className = m === 'stopwatch' ? 'flex-1 py-2.5 text-sm font-bold bg-white/10 rounded-lg text-white' : 'flex-1 py-2.5 text-sm font-bold text-gray-400';
+            document.getElementById('btnModeCd').className = m === 'countdown' ? 'flex-1 py-2.5 text-sm font-bold bg-white/10 rounded-lg text-white' : 'flex-1 py-2.5 text-sm font-bold text-gray-400';
+            document.getElementById('cdInputs').style.display = m === 'countdown' ? 'flex' : 'none';
+            resetToolTimer();
+        }
+        function toggleToolTimer() {
+            toolRun = !toolRun;
+            document.getElementById('toolPlayIcon').classList.toggle('hidden', toolRun);
+            document.getElementById('toolPauseIcon').classList.toggle('hidden', !toolRun);
+            if (toolRun) {
+                if (toolMode === 'countdown' && toolSecs === 0) {
+                    toolSecs = (parseInt(document.getElementById('inpCdH').value) || 0) * 3600 +
+                               (parseInt(document.getElementById('inpCdM').value) || 0) * 60 +
+                               (parseInt(document.getElementById('inpCdS').value) || 0);
+                }
+                toolInter = setInterval(() => {
+                    toolMode === 'countdown' ? toolSecs-- : toolSecs++;
+                    document.getElementById('toolTimeDisplay').innerText = formatHM(toolSecs);
+                    if (toolMode === 'countdown' && toolSecs <= 0) resetToolTimer();
+                }, 1000);
+            } else {
+                clearInterval(toolInter);
+            }
+        }
+        function resetToolTimer() {
+            clearInterval(toolInter);
+            toolRun = false;
+            toolSecs = toolMode === 'countdown'
+                ? ((parseInt(document.getElementById('inpCdH').value) || 0) * 3600 +
+                   (parseInt(document.getElementById('inpCdM').value) || 0) * 60 +
+                   (parseInt(document.getElementById('inpCdS').value) || 0))
+                : 0;
+            document.getElementById('toolTimeDisplay').innerText = formatHM(toolSecs);
+            document.getElementById('toolPlayIcon').classList.remove('hidden');
+            document.getElementById('toolPauseIcon').classList.add('hidden');
+        }
+
+        function renderStats() {
+            const total = state.subjects.reduce((acc, s) => acc + (s.elapsed || 0), 0);
+            document.getElementById('statTotalTime').innerText = formatHM(total);
+            const maxSub = Math.max(...state.subjects.map(s => s.elapsed || 0), 1);
+            const activeSubjects = state.subjects.filter(s => (s.elapsed || 0) > 0);
+            
+            if (activeSubjects.length === 0) {
+                document.getElementById('statBarsContainer').innerHTML = `<p class="text-xs text-gray-500 text-center py-8">아직 측정된 공부 기록이 없습니다.</p>`;
+                return;
+            }
+
+            document.getElementById('statBarsContainer').innerHTML = activeSubjects.map(s => `
+                <div>
+                    <div class="flex justify-between text-xs font-bold mb-1.5">
+                        <span style="color:${s.color}">${s.name}</span>
+                        <span class="text-gray-400 font-mono">${formatHM(s.elapsed)}</span>
+                    </div>
+                    <div class="w-full h-3 bg-black rounded-full overflow-hidden">
+                        <div class="h-full rounded-full transition-all duration-500" style="width:${(s.elapsed / maxSub) * 100}%; background-color:${s.color}"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderMainTodos() {
+            document.getElementById('mainTodoList').innerHTML = state.todos.map(t => `
+                <div class="flex items-center justify-between bg-ypSurface rounded-2xl p-4 border border-ypBorder">
+                    <label class="flex items-center space-x-3 cursor-pointer flex-1" onclick="toggleTodo(${t.id})">
+                        <i class="${t.done ? 'ph-fill ph-check-circle text-ypOrange text-2xl' : 'ph ph-circle text-gray-500 text-2xl'}"></i>
+                        <span class="text-[15px] font-medium ${t.done ? 'text-gray-500 line-through' : 'text-white'}">${t.text}</span>
+                    </label>
+                    <button onclick="deleteTodo(${t.id})" class="text-gray-500 hover:text-red-400 p-2"><i class="ph ph-trash text-xl"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function renderActiveTodos() {
+            const listEl = document.getElementById('activeTodoList');
+            if (!listEl) return;
+            if (state.todos.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-gray-500 text-center py-2">등록된 할 일이 없습니다.</p>`;
+                return;
+            }
+            listEl.innerHTML = state.todos.map(t => `
+                <div class="flex items-center space-x-2 cursor-pointer py-1" onclick="toggleTodo(${t.id})">
+                    <i class="${t.done ? 'ph-fill ph-check-circle text-ypOrange text-lg' : 'ph ph-circle text-gray-500 text-lg'}"></i>
+                    <span class="text-xs ${t.done ? 'text-gray-500 line-through' : 'text-white'}">${t.text}</span>
+                </div>
+            `).join('');
+        }
+
+        function addMainTodo(e) {
+            e.preventDefault();
+            const v = document.getElementById('mainTodoInput').value.trim();
+            if (v) {
+                state.todos.push({ id: Date.now(), text: v, done: false });
+                document.getElementById('mainTodoInput').value = '';
+                saveData();
+                renderMainTodos();
+            }
+        }
+
+        function toggleTodo(id) {
+            const t = state.todos.find(x => x.id === id);
+            if (t) {
+                t.done = !t.done;
+                saveData();
+                renderMainTodos();
+                renderActiveTodos();
+            }
+        }
+
+        function deleteTodo(id) {
+            state.todos = state.todos.filter(x => x.id !== id);
+            saveData();
+            renderMainTodos();
+            renderActiveTodos();
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
+
